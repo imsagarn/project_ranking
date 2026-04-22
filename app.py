@@ -110,53 +110,44 @@ def quantity_score(qty):
 # ── Score modifier widget ─────────────────────────────────────────────────────
 # Returns effective score (after possible override) and stores comment in session_state
 def score_modifier(field_key, auto_score, category, score_table=None):
-    """
-    Shows an expander below a question with:
-      - Score table for that field
-      - Override option
-      - Comment box
-    Returns the effective score to use.
-    """
     ov_key  = f"ov_val_{field_key}"
     use_key = f"ov_use_{field_key}"
     cmt_key = f"cmt_{field_key}"
+    show_key = f"show_{field_key}"
 
-    with st.expander("🔍 View / Modify score & add comment"):
-        # Score table
-        if score_table:
-            st.markdown("**Score table for this question:**")
-            table_rows = "".join(
-                f"<tr style='border-bottom:1px solid #eee'>"
-                f"<td style='padding:3px 16px 3px 0;color:#28251d'>{opt}</td>"
-                f"<td style='font-weight:700;color:#01696f'>{val}</td>"
-                f"</tr>"
-                for opt, val in score_table.items()
-            )
+    # Small inline toggle button
+    col_spacer, col_btn = st.columns([6, 1])
+    with col_btn:
+        if st.button("view/modify", key=f"btn_{field_key}", 
+                     help="View scores or override",
+                     use_container_width=True):
+            st.session_state[show_key] = not st.session_state.get(show_key, False)
+
+    if st.session_state.get(show_key, False):
+        with st.container():
             st.markdown(
-                f"<table style='font-size:0.83rem;margin-bottom:6px'>{table_rows}</table>",
+                f"<div style='background:#f9f8f5;border:1px solid #dcd9d5;border-radius:8px;"
+                f"padding:10px 14px;margin-bottom:8px;font-size:0.83rem;'>"
+                f"<span style='color:#7a7974;'>Viability score:</span> "
+                f"<b style='color:#01696f;'>{auto_score:.2f}</b>"
+                f"&emsp;"
+                f"<span style='color:#7a7974;'>Storage required score:</span> "
+                f"<b style='color:#01696f;'>{auto_score:.2f}</b>"
+                f"</div>",
                 unsafe_allow_html=True
             )
-        st.markdown(
-            f"<div style='background:#f0faf9;border-radius:6px;padding:6px 10px;"
-            f"font-size:0.85rem;margin-bottom:8px'>"
-            f"<b>Auto-score:</b> <span style='color:#01696f;font-weight:700'>{auto_score:.2f}</span>"
-            f" &nbsp;|&nbsp; <b>Category:</b> {category}</div>",
-            unsafe_allow_html=True
-        )
-
-        use_override = st.checkbox("✏️ Override this score", key=use_key)
-        if use_override:
-            st.number_input(
-                "Override value (0.0 – 1.0)", min_value=0.0, max_value=1.0,
-                step=0.05, value=float(auto_score), key=ov_key
+            use_override = st.toggle("Override score", key=use_key)
+            if use_override:
+                st.number_input(
+                    "Override value (0.0 – 1.0)", min_value=0.0, max_value=1.0,
+                    step=0.05, value=float(auto_score), key=ov_key,
+                    label_visibility="collapsed"
+                )
+            st.text_area(
+                "Comment", key=cmt_key, height=60,
+                placeholder="Add comment…", label_visibility="collapsed"
             )
 
-        st.text_area(
-            "💬 Comment / notes", key=cmt_key, height=70,
-            placeholder="Optional: add context, caveats, or observations…"
-        )
-
-    # Return effective score
     if st.session_state.get(use_key, False):
         return float(st.session_state.get(ov_key, auto_score))
     return float(auto_score)
