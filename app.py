@@ -222,4 +222,222 @@ with col_form:
     fc1, fc2 = st.columns(2)
     total_cost      = fc1.number_input("4. Total project cost (Mil. €)", min_value=0.0, step=10.0)
     funding_secured = fc2.number_input("5. Funding secured (Mil. €)", min_value=0.0, step=10.0)
-    auto_fund = funding_score(total_cost if total_cost>0 else None, fun
+    auto_fund = funding_score(total_cost if total_cost>0 else None, funding_secured if funding_secured>0 else None)
+    eff["funding"] = score_modifier("funding", auto_fund, "Viability",
+        {"< 20% secured": 0.0, "20–60% secured": 0.5, "> 60% secured": 1.0})
+
+    st.selectbox("6. Funded by government / grants?", ["Yes","No","Partial"])
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── Technical Setup ────────────────────────────────────────────────────
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">⚙️ Technical Setup</div>', unsafe_allow_html=True)
+
+    h2_source = st.selectbox("7. Hydrogen Source?", list(H2_SOURCE.keys()))
+    eff["h2_source"] = score_modifier("h2_source", H2_SOURCE.get(h2_source,0), "Readiness", H2_SOURCE)
+
+    st.number_input("8. Electrolyzer Size (MW)", min_value=0.0, step=1.0)
+
+    ppa_signed = st.selectbox("9. Power/H2 purchase agreement signed?", list(PPA_SIGNED.keys()))
+    eff["ppa"] = score_modifier("ppa", PPA_SIGNED.get(ppa_signed,0), "Readiness", PPA_SIGNED)
+
+    power_source = st.selectbox("10. Power Source?", list(POWER_SOURCE.keys()))
+    eff["power"] = score_modifier("power", POWER_SOURCE.get(power_source,0), "Strategic Fit", POWER_SOURCE)
+
+    h2_qty = st.number_input("11. Quantity of H2 to be stored (tonnes)", min_value=0.0, step=0.5)
+    auto_qty = quantity_score(h2_qty if h2_qty>0 else None)
+    eff["h2_qty"] = score_modifier("h2_qty", auto_qty, "Storage Required",
+        {"< 1 t": 0.0, "1–5 t": 0.5, "5–15 t": 1.0, "> 15 t": 0.5})
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── Project Readiness ──────────────────────────────────────────────────
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">📊 Project Readiness</div>', unsafe_allow_html=True)
+
+    contract = st.selectbox("12. Contract signed with technology supplier?", list(CONTRACT_SIGNED.keys()))
+    eff["contract"] = score_modifier("contract", CONTRACT_SIGNED.get(contract,0), "Readiness", CONTRACT_SIGNED)
+
+    offtaker = st.selectbox("13. Offtaker found & contract signed?", list(OFFTAKER.keys()))
+    eff["offtaker"] = score_modifier("offtaker", OFFTAKER.get(offtaker,0), "Viability", OFFTAKER)
+
+    land_area = st.selectbox("14. Land area secured?", list(LAND_AREA.keys()))
+    eff["land"] = score_modifier("land", LAND_AREA.get(land_area,0), "Readiness", LAND_AREA)
+
+    permits = st.selectbox("15. Permitting status?", list(PERMITS.keys()))
+    eff["permits"] = score_modifier("permits", PERMITS.get(permits,0), "Viability", PERMITS)
+
+    eng = st.selectbox("16. Engineering Maturity / Project Stage?", list(ENG_MATURITY.keys()))
+    eff["eng"] = score_modifier("eng", ENG_MATURITY.get(eng,0), "Readiness", ENG_MATURITY)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── Developer Profile ──────────────────────────────────────────────────
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">👤 Developer Profile</div>', unsafe_allow_html=True)
+
+    h2_dna = st.selectbox("17. Is H2 in their DNA?", list(H2_DNA.keys()))
+    eff["h2_dna"] = score_modifier("h2_dna", H2_DNA.get(h2_dna,0), "Strategic Fit", H2_DNA)
+
+    track = st.selectbox("18. Developer track record?", list(TRACK_RECORD.keys()))
+    eff["track"] = score_modifier("track", TRACK_RECORD.get(track,0), "Strategic Fit", TRACK_RECORD)
+
+    innov = st.selectbox("19. Open to innovative solutions?", list(INNOVATION.keys()))
+    eff["innov"] = score_modifier("innov", INNOVATION.get(innov,0), "Strategic Fit", INNOVATION)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── Site Constraints ───────────────────────────────────────────────────
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">🏗️ Site Constraints</div>', unsafe_allow_html=True)
+
+    footprint = st.selectbox("20. Footprint constraint?", list(FOOTPRINT.keys()))
+    eff["footprint"] = score_modifier("footprint", FOOTPRINT.get(footprint,0), "Storage Required", FOOTPRINT)
+
+    safety = st.selectbox("21. Safety a big deal?", list(SAFETY.keys()))
+    eff["safety"] = score_modifier("safety", SAFETY.get(safety,0), "Storage Required", SAFETY)
+
+    geo = st.selectbox("22. Geological constraints?", list(GEO_CONSTRAINT.keys()))
+    eff["geo"] = score_modifier("geo", GEO_CONSTRAINT.get(geo,0), "Storage Required", GEO_CONSTRAINT)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    submitted = st.button("🚀 Evaluate Project")
+
+# ── Compute scores using effective values ─────────────────────────────────────
+sr = eff["app_sr"] + eff["h2_qty"] + eff["footprint"] + eff["safety"] + eff["geo"]
+vi = eff["app_vi"] + eff["funding"] + eff["nat_prio"] + eff["offtaker"] + eff["country_fit"] + eff["permits"]
+rd = eff["contract"] + eff["land"] + eff["eng"] + eff["ppa"] + eff["h2_source"]
+sf = eff["power"] + eff["h2_dna"] + eff["track"] + eff["innov"]
+
+total     = sr + vi + rd + sf
+total_max = 20
+pct       = round(total / total_max * 100, 1)
+
+if pct >= 80:   rating = "A"
+elif pct >= 60: rating = "B"
+elif pct >= 40: rating = "C"
+else:           rating = "D"
+
+# Check if any override is active
+any_override = any(
+    st.session_state.get(f"ov_use_{k}", False)
+    for k in ["app_sr","app_vi","country_fit","nat_prio","funding","h2_source","ppa",
+              "power","h2_qty","contract","offtaker","land","permits","eng",
+              "h2_dna","track","innov","footprint","safety","geo"]
+)
+
+# ── Results panel ─────────────────────────────────────────────────────────────
+with col_result:
+    st.markdown("### 📈 Evaluation Results")
+
+    if any_override:
+        st.warning("⚠️ One or more scores have been manually overridden.")
+
+    rname, rdesc = RATING_DESC[rating]
+    rcolor = RATING_COLOR[rating]
+
+    st.markdown(f"""
+    <div class="score-card" style="text-align:center;">
+      <div class="score-label">Overall Rating</div>
+      <div style="margin:0.5rem 0;"><span class="rating-badge {rcolor}">{rating}</span></div>
+      <div style="font-size:1rem;font-weight:600;color:#28251d;">{rname}</div>
+      <div style="font-size:0.85rem;color:#7a7974;margin-top:0.3rem;">{rdesc}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown(f"""
+    <div class="score-card">
+      <div class="score-label">Total Score</div>
+      <div>
+        <span class="score-value">{total:.1f}</span>
+        <span class="score-max"> / {total_max} &nbsp;({pct}%)</span>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.progress(pct / 100)
+
+    for label, val, mx in [
+        ("🗃️ Storage Required", sr, 5),
+        ("✅ Viability",        vi, 6),
+        ("📋 Readiness",        rd, 5),
+        ("🎯 Strategic Fit",    sf, 4),
+    ]:
+        st.markdown(f"""
+        <div class="score-card">
+          <div class="score-label">{label}</div>
+          <div>
+            <span class="score-value" style="font-size:1.4rem;">{val:.1f}</span>
+            <span class="score-max"> / {mx}</span>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.progress(val / mx if mx > 0 else 0)
+
+    # Comments summary
+    all_comments = {
+        k: st.session_state.get(f"cmt_{k}", "")
+        for k in ["app_sr","app_vi","country_fit","nat_prio","funding","h2_source","ppa",
+                  "power","h2_qty","contract","offtaker","land","permits","eng",
+                  "h2_dna","track","innov","footprint","safety","geo"]
+    }
+    filled = {k: v for k, v in all_comments.items() if v and v.strip()}
+    if filled:
+        with st.expander(f"📝 Comments summary ({len(filled)} note(s))"):
+            label_map = {
+                "app_sr":"Application (Storage)","app_vi":"Application (Viability)",
+                "country_fit":"Country Fit","nat_prio":"National Priority",
+                "funding":"Funding","h2_source":"H2 Source","ppa":"PPA Signed",
+                "power":"Power Source","h2_qty":"H2 Quantity","contract":"Contract Signed",
+                "offtaker":"Offtaker","land":"Land Area","permits":"Permits",
+                "eng":"Engineering Maturity","h2_dna":"H2 in DNA","track":"Track Record",
+                "innov":"Innovation","footprint":"Footprint","safety":"Safety","geo":"Geology",
+            }
+            for k, v in filled.items():
+                st.markdown(f"**{label_map.get(k,k)}:** {v}")
+
+    # Export
+    if submitted and project_name:
+        overrides_used = {
+            k: st.session_state.get(f"ov_val_{k}")
+            for k in all_comments
+            if st.session_state.get(f"ov_use_{k}", False)
+        }
+        export = {
+            "project_name": project_name,
+            "evaluated_by": evaluated_by,
+            "region":       region,
+            "date":         str(eval_date),
+            "overrides":    {k: v for k, v in overrides_used.items() if v is not None},
+            "comments":     filled,
+            "scores": {
+                "storage_required": round(sr, 3),
+                "viability":        round(vi, 3),
+                "readiness":        round(rd, 3),
+                "strategic_fit":    round(sf, 3),
+                "total":            round(total, 3),
+                "total_max":        total_max,
+                "pct":              pct,
+                "rating":           rating,
+            }
+        }
+        col_dl1, col_dl2 = st.columns(2)
+        col_dl1.download_button(
+            "⬇️ JSON", data=json.dumps(export, indent=2),
+            file_name=f"{project_name.replace(' ','_')}_score.json",
+            mime="application/json"
+        )
+        df_export = pd.DataFrame([{
+            "Project": project_name, "Region": region, "Rating": rating,
+            "Score %": pct, "Storage Required": sr, "Viability": vi,
+            "Readiness": rd, "Strategic Fit": sf, "Total": total,
+            "Overrides": len(overrides_used),
+        }])
+        col_dl2.download_button(
+            "⬇️ CSV", data=df_export.to_csv(index=False),
+            file_name=f"{project_name.replace(' ','_')}_score.csv",
+            mime="text/csv"
+        )
+        st.success("✅ Evaluation complete!")
+    else:
+        st.info("👈 Fill in the form and click **Evaluate Project**.")
