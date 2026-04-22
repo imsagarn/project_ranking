@@ -46,12 +46,6 @@ st.markdown("""
     display:inline-block; font-size:1.2rem; font-weight:700;
     padding:0.4rem 1.2rem; border-radius:6px; margin-bottom:0.5rem;
   }
-  div[data-testid="stExpander"] {
-    border: 1px solid #e8e5e0 !important;
-    border-radius: 8px !important;
-    margin-top: 0.3rem !important;
-    margin-bottom: 0.8rem !important;
-  }
   .stButton>button {
     background: #01696f; color: white; border: none;
     border-radius: 8px; padding: 0.65rem 2rem;
@@ -59,6 +53,20 @@ st.markdown("""
   }
   .stButton>button:hover { background: #0c4e54; }
   .stProgress > div > div { background-color: #01696f; }
+
+  /* Ghost view/modify button override */
+  button.vm-btn {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #7a7974 !important;
+    font-size: 0.75rem !important;
+    font-weight: 500 !important;
+    padding: 0 2px !important;
+    width: auto !important;
+    cursor: pointer;
+    text-decoration: none;
+  }
 </style>
 """, unsafe_allow_html=True)
 
@@ -108,38 +116,91 @@ def quantity_score(qty):
     return 0.5
 
 # ── Score modifier widget ─────────────────────────────────────────────────────
-# Returns effective score (after possible override) and stores comment in session_state
-def score_modifier(field_key, auto_score, category, score_table=None):
-    ov_key  = f"ov_val_{field_key}"
-    use_key = f"ov_use_{field_key}"
-    cmt_key = f"cmt_{field_key}"
+def score_modifier(field_key, auto_score, category, score_table=None,
+                   viability_score=None, storage_score=None):
+    """
+    Minimal inline view/modify toggle.
+    Shows only the score type(s) relevant to this question.
+    """
+    ov_key   = f"ov_val_{field_key}"
+    use_key  = f"ov_use_{field_key}"
+    cmt_key  = f"cmt_{field_key}"
     show_key = f"show_{field_key}"
 
-    # Small inline toggle button
-    col_spacer, col_btn = st.columns([6, 1])
-    with col_btn:
-        if st.button("view/modify", key=f"btn_{field_key}", 
-                     help="View scores or override",
-                     use_container_width=False):
-            st.session_state[show_key] = not st.session_state.get(show_key, False)
+    # Determine which score rows to display
+    score_rows = []
+    if viability_score is not None:
+        score_rows.append(("Viability score", viability_score))
+    if storage_score is not None:
+        score_rows.append(("Storage required score", storage_score))
+    if not score_rows:
+        # fallback: infer from category
+        if category == "Storage Required":
+            score_rows.append(("Storage required score", auto_score))
+        else:
+            score_rows.append(("Viability score", auto_score))
+
+    is_open = st.session_state.get(show_key, False)
+    chevron = "▴" if is_open else "▾"
+
+    # Ghost button: right-aligned, no border, no background
+    _, btn_col = st.columns([9, 1])
+    with btn_col:
+        st.markdown(
+            f"""
+            <style>
+            div[data-testid="column"]:last-child .stButton > button {{
+                background: none !important;
+                border: none !important;
+                box-shadow: none !important;
+                color: #9a9892 !important;
+                font-size: 0.72rem !important;
+                font-weight: 500 !important;
+                padding: 0 2px !important;
+                min-height: unset !important;
+                width: auto !important;
+                line-height: 1.4 !important;
+                letter-spacing: 0.01em;
+            }}
+            div[data-testid="column"]:last-child .stButton > button:hover {{
+                color: #01696f !important;
+                background: none !important;
+            }}
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+        if st.button(f"view/modify {chevron}", key=f"btn_{field_key}"):
+            st.session_state[show_key] = not is_open
+            st.rerun()
 
     if st.session_state.get(show_key, False):
+        pills_html = "&emsp;&nbsp;".join(
+            f"<span style='color:#7a7974;font-size:0.8rem'>{label}:</span>&nbsp;"
+            f"<b style='color:#01696f;font-size:0.8rem'>{val:.2f}</b>"
+            for label, val in score_rows
+        )
+
+        st.markdown(
+            f"""
+            <div style='
+                background:#f9f8f5;
+                border:1px solid #e8e5e0;
+                border-radius:8px;
+                padding:12px 16px 4px 16px;
+                margin-bottom:4px;
+            '>
+                <div style='margin-bottom:10px'>{pills_html}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
         with st.container():
-            st.markdown(
-                f"<div style='background:#f9f8f5;border:1px solid #dcd9d5;border-radius:8px;"
-                f"padding:10px 14px;margin-bottom:8px;font-size:0.83rem;'>"
-                f"<span style='color:#7a7974;'>Viability score:</span> "
-                f"<b style='color:#01696f;'>{auto_score:.2f}</b>"
-                f"&emsp;"
-                f"<span style='color:#7a7974;'>Storage required score:</span> "
-                f"<b style='color:#01696f;'>{auto_score:.2f}</b>"
-                f"</div>",
-                unsafe_allow_html=True
-            )
             use_override = st.toggle("Override score", key=use_key)
             if use_override:
                 st.number_input(
-                    "Override value (0.0 – 1.0)", min_value=0.0, max_value=1.0,
+                    "Override value (0.0–1.0)", min_value=0.0, max_value=1.0,
                     step=0.05, value=float(auto_score), key=ov_key,
                     label_visibility="collapsed"
                 )
@@ -171,7 +232,6 @@ st.markdown("""
 
 col_form, col_result = st.columns([3, 2], gap="large")
 
-# All effective scores collected here (filled during form rendering)
 eff = {}
 
 with col_form:
@@ -192,17 +252,31 @@ with col_form:
     st.markdown('<div class="section-title">🏭 Application & Market</div>', unsafe_allow_html=True)
 
     application = st.selectbox("1. Application area?", list(APPLICATIONS.keys()))
-    app_auto    = APPLICATIONS.get(application, {"storage_required":0.5,"viability":0.5})
-    eff["app_sr"] = score_modifier("app_sr", app_auto["storage_required"], "Storage Required",
-        {k: v["storage_required"] for k,v in APPLICATIONS.items()})
-    eff["app_vi"] = score_modifier("app_vi", app_auto["viability"], "Viability",
-        {k: v["viability"] for k,v in APPLICATIONS.items()})
+    app_auto    = APPLICATIONS.get(application, {"storage_required": 0.5, "viability": 0.5})
+    # Application has BOTH scores — show both in one modifier
+    eff["app_sr"] = score_modifier(
+        "app_sr", app_auto["storage_required"], "Storage Required",
+        storage_score=app_auto["storage_required"],
+        viability_score=app_auto["viability"]
+    )
+    # app_vi shares the same panel — derive from app_auto directly
+    # (if user overrides app_sr, we mirror same override intent for viability)
+    if st.session_state.get("ov_use_app_sr", False):
+        eff["app_vi"] = float(st.session_state.get("ov_val_app_sr", app_auto["viability"]))
+    else:
+        eff["app_vi"] = app_auto["viability"]
 
-    country_fit = st.selectbox("2. Country a good fit?", list(COUNTRY_FIT.keys()))
-    eff["country_fit"] = score_modifier("country_fit", COUNTRY_FIT.get(country_fit,0), "Viability", COUNTRY_FIT)
+    country_fit_sel = st.selectbox("2. Country a good fit?", list(COUNTRY_FIT.keys()))
+    eff["country_fit"] = score_modifier(
+        "country_fit", COUNTRY_FIT.get(country_fit_sel, 0), "Viability",
+        COUNTRY_FIT, viability_score=COUNTRY_FIT.get(country_fit_sel, 0)
+    )
 
     national_prio = st.selectbox("3. Is it the project of national priority?", list(NATIONAL_PRIORITY.keys()))
-    eff["nat_prio"] = score_modifier("nat_prio", NATIONAL_PRIORITY.get(national_prio,0), "Viability", NATIONAL_PRIORITY)
+    eff["nat_prio"] = score_modifier(
+        "nat_prio", NATIONAL_PRIORITY.get(national_prio, 0), "Viability",
+        NATIONAL_PRIORITY, viability_score=NATIONAL_PRIORITY.get(national_prio, 0)
+    )
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -213,11 +287,15 @@ with col_form:
     fc1, fc2 = st.columns(2)
     total_cost      = fc1.number_input("4. Total project cost (Mil. €)", min_value=0.0, step=10.0)
     funding_secured = fc2.number_input("5. Funding secured (Mil. €)", min_value=0.0, step=10.0)
-    auto_fund = funding_score(total_cost if total_cost>0 else None, funding_secured if funding_secured>0 else None)
-    eff["funding"] = score_modifier("funding", auto_fund, "Viability",
-        {"< 20% secured": 0.0, "20–60% secured": 0.5, "> 60% secured": 1.0})
+    auto_fund = funding_score(total_cost if total_cost > 0 else None,
+                              funding_secured if funding_secured > 0 else None)
+    eff["funding"] = score_modifier(
+        "funding", auto_fund, "Viability",
+        {"< 20% secured": 0.0, "20–60% secured": 0.5, "> 60% secured": 1.0},
+        viability_score=auto_fund
+    )
 
-    st.selectbox("6. Funded by government / grants?", ["Yes","No","Partial"])
+    st.selectbox("6. Funded by government / grants?", ["Yes", "No", "Partial"])
     st.markdown('</div>', unsafe_allow_html=True)
 
     # ── Technical Setup ────────────────────────────────────────────────────
@@ -225,20 +303,32 @@ with col_form:
     st.markdown('<div class="section-title">⚙️ Technical Setup</div>', unsafe_allow_html=True)
 
     h2_source = st.selectbox("7. Hydrogen Source?", list(H2_SOURCE.keys()))
-    eff["h2_source"] = score_modifier("h2_source", H2_SOURCE.get(h2_source,0), "Readiness", H2_SOURCE)
+    eff["h2_source"] = score_modifier(
+        "h2_source", H2_SOURCE.get(h2_source, 0), "Readiness",
+        H2_SOURCE, viability_score=H2_SOURCE.get(h2_source, 0)
+    )
 
     st.number_input("8. Electrolyzer Size (MW)", min_value=0.0, step=1.0)
 
     ppa_signed = st.selectbox("9. Power/H2 purchase agreement signed?", list(PPA_SIGNED.keys()))
-    eff["ppa"] = score_modifier("ppa", PPA_SIGNED.get(ppa_signed,0), "Readiness", PPA_SIGNED)
+    eff["ppa"] = score_modifier(
+        "ppa", PPA_SIGNED.get(ppa_signed, 0), "Readiness",
+        PPA_SIGNED, viability_score=PPA_SIGNED.get(ppa_signed, 0)
+    )
 
     power_source = st.selectbox("10. Power Source?", list(POWER_SOURCE.keys()))
-    eff["power"] = score_modifier("power", POWER_SOURCE.get(power_source,0), "Strategic Fit", POWER_SOURCE)
+    eff["power"] = score_modifier(
+        "power", POWER_SOURCE.get(power_source, 0), "Strategic Fit",
+        POWER_SOURCE, viability_score=POWER_SOURCE.get(power_source, 0)
+    )
 
     h2_qty = st.number_input("11. Quantity of H2 to be stored (tonnes)", min_value=0.0, step=0.5)
-    auto_qty = quantity_score(h2_qty if h2_qty>0 else None)
-    eff["h2_qty"] = score_modifier("h2_qty", auto_qty, "Storage Required",
-        {"< 1 t": 0.0, "1–5 t": 0.5, "5–15 t": 1.0, "> 15 t": 0.5})
+    auto_qty = quantity_score(h2_qty if h2_qty > 0 else None)
+    eff["h2_qty"] = score_modifier(
+        "h2_qty", auto_qty, "Storage Required",
+        {"< 1 t": 0.0, "1–5 t": 0.5, "5–15 t": 1.0, "> 15 t": 0.5},
+        storage_score=auto_qty  # storage only — no viability for this question
+    )
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -247,19 +337,34 @@ with col_form:
     st.markdown('<div class="section-title">📊 Project Readiness</div>', unsafe_allow_html=True)
 
     contract = st.selectbox("12. Contract signed with technology supplier?", list(CONTRACT_SIGNED.keys()))
-    eff["contract"] = score_modifier("contract", CONTRACT_SIGNED.get(contract,0), "Readiness", CONTRACT_SIGNED)
+    eff["contract"] = score_modifier(
+        "contract", CONTRACT_SIGNED.get(contract, 0), "Readiness",
+        CONTRACT_SIGNED, viability_score=CONTRACT_SIGNED.get(contract, 0)
+    )
 
     offtaker = st.selectbox("13. Offtaker found & contract signed?", list(OFFTAKER.keys()))
-    eff["offtaker"] = score_modifier("offtaker", OFFTAKER.get(offtaker,0), "Viability", OFFTAKER)
+    eff["offtaker"] = score_modifier(
+        "offtaker", OFFTAKER.get(offtaker, 0), "Viability",
+        OFFTAKER, viability_score=OFFTAKER.get(offtaker, 0)
+    )
 
     land_area = st.selectbox("14. Land area secured?", list(LAND_AREA.keys()))
-    eff["land"] = score_modifier("land", LAND_AREA.get(land_area,0), "Readiness", LAND_AREA)
+    eff["land"] = score_modifier(
+        "land", LAND_AREA.get(land_area, 0), "Readiness",
+        LAND_AREA, viability_score=LAND_AREA.get(land_area, 0)
+    )
 
     permits = st.selectbox("15. Permitting status?", list(PERMITS.keys()))
-    eff["permits"] = score_modifier("permits", PERMITS.get(permits,0), "Viability", PERMITS)
+    eff["permits"] = score_modifier(
+        "permits", PERMITS.get(permits, 0), "Viability",
+        PERMITS, viability_score=PERMITS.get(permits, 0)
+    )
 
     eng = st.selectbox("16. Engineering Maturity / Project Stage?", list(ENG_MATURITY.keys()))
-    eff["eng"] = score_modifier("eng", ENG_MATURITY.get(eng,0), "Readiness", ENG_MATURITY)
+    eff["eng"] = score_modifier(
+        "eng", ENG_MATURITY.get(eng, 0), "Readiness",
+        ENG_MATURITY, viability_score=ENG_MATURITY.get(eng, 0)
+    )
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -268,13 +373,22 @@ with col_form:
     st.markdown('<div class="section-title">👤 Developer Profile</div>', unsafe_allow_html=True)
 
     h2_dna = st.selectbox("17. Is H2 in their DNA?", list(H2_DNA.keys()))
-    eff["h2_dna"] = score_modifier("h2_dna", H2_DNA.get(h2_dna,0), "Strategic Fit", H2_DNA)
+    eff["h2_dna"] = score_modifier(
+        "h2_dna", H2_DNA.get(h2_dna, 0), "Strategic Fit",
+        H2_DNA, viability_score=H2_DNA.get(h2_dna, 0)
+    )
 
     track = st.selectbox("18. Developer track record?", list(TRACK_RECORD.keys()))
-    eff["track"] = score_modifier("track", TRACK_RECORD.get(track,0), "Strategic Fit", TRACK_RECORD)
+    eff["track"] = score_modifier(
+        "track", TRACK_RECORD.get(track, 0), "Strategic Fit",
+        TRACK_RECORD, viability_score=TRACK_RECORD.get(track, 0)
+    )
 
     innov = st.selectbox("19. Open to innovative solutions?", list(INNOVATION.keys()))
-    eff["innov"] = score_modifier("innov", INNOVATION.get(innov,0), "Strategic Fit", INNOVATION)
+    eff["innov"] = score_modifier(
+        "innov", INNOVATION.get(innov, 0), "Strategic Fit",
+        INNOVATION, viability_score=INNOVATION.get(innov, 0)
+    )
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -283,19 +397,28 @@ with col_form:
     st.markdown('<div class="section-title">🏗️ Site Constraints</div>', unsafe_allow_html=True)
 
     footprint = st.selectbox("20. Footprint constraint?", list(FOOTPRINT.keys()))
-    eff["footprint"] = score_modifier("footprint", FOOTPRINT.get(footprint,0), "Storage Required", FOOTPRINT)
+    eff["footprint"] = score_modifier(
+        "footprint", FOOTPRINT.get(footprint, 0), "Storage Required",
+        FOOTPRINT, storage_score=FOOTPRINT.get(footprint, 0)
+    )
 
     safety = st.selectbox("21. Safety a big deal?", list(SAFETY.keys()))
-    eff["safety"] = score_modifier("safety", SAFETY.get(safety,0), "Storage Required", SAFETY)
+    eff["safety"] = score_modifier(
+        "safety", SAFETY.get(safety, 0), "Storage Required",
+        SAFETY, storage_score=SAFETY.get(safety, 0)
+    )
 
     geo = st.selectbox("22. Geological constraints?", list(GEO_CONSTRAINT.keys()))
-    eff["geo"] = score_modifier("geo", GEO_CONSTRAINT.get(geo,0), "Storage Required", GEO_CONSTRAINT)
+    eff["geo"] = score_modifier(
+        "geo", GEO_CONSTRAINT.get(geo, 0), "Storage Required",
+        GEO_CONSTRAINT, storage_score=GEO_CONSTRAINT.get(geo, 0)
+    )
 
     st.markdown('</div>', unsafe_allow_html=True)
 
     submitted = st.button("🚀 Evaluate Project")
 
-# ── Compute scores using effective values ─────────────────────────────────────
+# ── Compute scores ─────────────────────────────────────────────────────────────
 sr = eff["app_sr"] + eff["h2_qty"] + eff["footprint"] + eff["safety"] + eff["geo"]
 vi = eff["app_vi"] + eff["funding"] + eff["nat_prio"] + eff["offtaker"] + eff["country_fit"] + eff["permits"]
 rd = eff["contract"] + eff["land"] + eff["eng"] + eff["ppa"] + eff["h2_source"]
@@ -310,10 +433,9 @@ elif pct >= 60: rating = "B"
 elif pct >= 40: rating = "C"
 else:           rating = "D"
 
-# Check if any override is active
 any_override = any(
     st.session_state.get(f"ov_use_{k}", False)
-    for k in ["app_sr","app_vi","country_fit","nat_prio","funding","h2_source","ppa",
+    for k in ["app_sr","country_fit","nat_prio","funding","h2_source","ppa",
               "power","h2_qty","contract","offtaker","land","permits","eng",
               "h2_dna","track","innov","footprint","safety","geo"]
 )
@@ -368,7 +490,7 @@ with col_result:
     # Comments summary
     all_comments = {
         k: st.session_state.get(f"cmt_{k}", "")
-        for k in ["app_sr","app_vi","country_fit","nat_prio","funding","h2_source","ppa",
+        for k in ["app_sr","country_fit","nat_prio","funding","h2_source","ppa",
                   "power","h2_qty","contract","offtaker","land","permits","eng",
                   "h2_dna","track","innov","footprint","safety","geo"]
     }
@@ -376,13 +498,13 @@ with col_result:
     if filled:
         with st.expander(f"📝 Comments summary ({len(filled)} note(s))"):
             label_map = {
-                "app_sr":"Application (Storage)","app_vi":"Application (Viability)",
-                "country_fit":"Country Fit","nat_prio":"National Priority",
-                "funding":"Funding","h2_source":"H2 Source","ppa":"PPA Signed",
-                "power":"Power Source","h2_qty":"H2 Quantity","contract":"Contract Signed",
-                "offtaker":"Offtaker","land":"Land Area","permits":"Permits",
-                "eng":"Engineering Maturity","h2_dna":"H2 in DNA","track":"Track Record",
-                "innov":"Innovation","footprint":"Footprint","safety":"Safety","geo":"Geology",
+                "app_sr":"Application (Storage & Viability)","country_fit":"Country Fit",
+                "nat_prio":"National Priority","funding":"Funding","h2_source":"H2 Source",
+                "ppa":"PPA Signed","power":"Power Source","h2_qty":"H2 Quantity",
+                "contract":"Contract Signed","offtaker":"Offtaker","land":"Land Area",
+                "permits":"Permits","eng":"Engineering Maturity","h2_dna":"H2 in DNA",
+                "track":"Track Record","innov":"Innovation","footprint":"Footprint",
+                "safety":"Safety","geo":"Geology",
             }
             for k, v in filled.items():
                 st.markdown(f"**{label_map.get(k,k)}:** {v}")
