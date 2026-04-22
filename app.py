@@ -222,13 +222,45 @@ RATING_DESC = {
 
 RATING_COLOR = {"A": "rating-A", "B": "rating-B", "C": "rating-C", "D": "rating-D"}
 
+st.markdown("""
+<style>
+/* --- EXISTING STYLES (keep yours above this) --- */
+
+/* EXPANDER: remove box completely */
+div[data-testid="stExpander"] {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    margin-top: -8px !important;
+}
+
+/* remove inner container styling */
+div[data-testid="stExpander"] > div {
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+}
+
+/* make expander label small + right aligned */
+div[data-testid="stExpander"] summary {
+    font-size: 0.72rem !important;
+    color: #7a7974 !important;
+    padding: 0 !important;
+    text-align: right;
+}
+
+/* remove extra spacing */
+div[data-testid="stExpanderContent"] {
+    padding-top: 0.3rem !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # ── Helper: render a question row with expander ──────────────────────────────
 def q_expander(q_key, label, auto_score, max_score=1, category=""):
     """
-    Renders a small 'view/modify ▾' expander below a question widget.
-    Returns (effective_score, comment).
+    Right-aligned, borderless expander.
     """
-    # Session state keys
     override_key = f"override_{q_key}"
     toggle_key   = f"toggle_{q_key}"
     comment_key  = f"comment_{q_key}"
@@ -241,47 +273,53 @@ def q_expander(q_key, label, auto_score, max_score=1, category=""):
     if score_key not in st.session_state:
         st.session_state[score_key] = float(auto_score)
 
-    with st.expander("view/modify ▾", expanded=False):
-        col_a, col_b = st.columns([2, 3])
-        with col_a:
-            auto_display = f"{auto_score} / {max_score}"
-            st.markdown(
-                f"<div style='font-size:0.78rem;color:#7a7974;font-weight:600;"
-                f"text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;'>Auto score</div>"
-                f"<div style='font-size:1.1rem;font-weight:700;color:#01696f;'>{auto_display}</div>",
-                unsafe_allow_html=True
-            )
-        with col_b:
-            manual = st.toggle("Override score", key=toggle_key, value=st.session_state[override_key])
-            st.session_state[override_key] = manual
+    # 🔥 RIGHT-ALIGNED layout
+    col_l, col_r = st.columns([5, 1])
 
-        if manual:
-            new_score = st.number_input(
-                "Manual score",
-                min_value=0.0,
-                max_value=float(max_score),
-                value=float(st.session_state[score_key]),
-                step=0.5,
-                key=f"manual_input_{q_key}",
+    with col_r:
+        with st.expander("view/modify ▾", expanded=False):
+
+            col_a, col_b = st.columns([2, 3])
+
+            with col_a:
+                auto_display = f"{auto_score} / {max_score}"
+                st.markdown(
+                    f"<div style='font-size:0.75rem;color:#7a7974;font-weight:600;'>Auto</div>"
+                    f"<div style='font-size:1.1rem;font-weight:700;color:#01696f;'>{auto_display}</div>",
+                    unsafe_allow_html=True
+                )
+
+            with col_b:
+                manual = st.toggle("Override", key=toggle_key, value=st.session_state[override_key])
+                st.session_state[override_key] = manual
+
+            if manual:
+                new_score = st.number_input(
+                    "Manual score",
+                    min_value=0.0,
+                    max_value=float(max_score),
+                    value=float(st.session_state[score_key]),
+                    step=0.25,
+                    key=f"manual_input_{q_key}",
+                    label_visibility="collapsed"
+                )
+                st.session_state[score_key] = new_score
+            else:
+                st.session_state[score_key] = float(auto_score)
+
+            comment = st.text_input(
+                "Comment",
+                value=st.session_state[comment_key],
+                placeholder="Add a note…",
+                key=f"comment_input_{q_key}",
                 label_visibility="collapsed"
             )
-            st.session_state[score_key] = new_score
-        else:
-            st.session_state[score_key] = float(auto_score)
-
-        comment = st.text_input(
-            "Comment",
-            value=st.session_state[comment_key],
-            placeholder="Add a note…",
-            key=f"comment_input_{q_key}",
-            label_visibility="collapsed"
-        )
-        st.session_state[comment_key] = comment
+            st.session_state[comment_key] = comment
 
     effective = st.session_state[score_key] if st.session_state[override_key] else float(auto_score)
     return effective, st.session_state[comment_key]
 
-
+with st.expander("⚙️", expanded=False):
 # ── UI ────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <div class="main-header">
