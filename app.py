@@ -118,23 +118,17 @@ def quantity_score(qty):
 # ── Score modifier widget ─────────────────────────────────────────────────────
 def score_modifier(field_key, auto_score, category, score_table=None,
                    viability_score=None, storage_score=None):
-    """
-    Minimal inline view/modify toggle.
-    Shows only the score type(s) relevant to this question.
-    """
     ov_key   = f"ov_val_{field_key}"
     use_key  = f"ov_use_{field_key}"
     cmt_key  = f"cmt_{field_key}"
     show_key = f"show_{field_key}"
 
-    # Determine which score rows to display
     score_rows = []
     if viability_score is not None:
         score_rows.append(("Viability score", viability_score))
     if storage_score is not None:
         score_rows.append(("Storage required score", storage_score))
     if not score_rows:
-        # fallback: infer from category
         if category == "Storage Required":
             score_rows.append(("Storage required score", auto_score))
         else:
@@ -143,66 +137,80 @@ def score_modifier(field_key, auto_score, category, score_table=None,
     is_open = st.session_state.get(show_key, False)
     chevron = "▴" if is_open else "▾"
 
-    # Ghost button: right-aligned, no border, no background
-    _, btn_col = st.columns([9, 1])
+    # Ghost button: inject scoped CSS that overrides the global .stButton rule
+    # We target by the button's unique data-testid generated from its key
+    st.markdown(f"""
+    <style>
+    [data-testid="stButton"] [key="btn_{field_key}"] button,
+    div:has(> [data-testid="stButton"] button[data-testid="baseButton-secondary"]:last-of-type) button {{
+        all: unset;
+    }}
+    /* Scoped override: any button inside the column that holds our ghost button */
+    .vm-ghost-{field_key} button {{
+        background: none !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: #9a9892 !important;
+        font-size: 0.75rem !important;
+        font-weight: 500 !important;
+        padding: 2px 4px !important;
+        min-height: unset !important;
+        height: auto !important;
+        width: auto !important;
+        line-height: 1.4 !important;
+        cursor: pointer !important;
+        display: inline !important;
+        white-space: nowrap !important;
+    }}
+    .vm-ghost-{field_key} button:hover {{
+        color: #01696f !important;
+        background: none !important;
+    }}
+    .vm-ghost-{field_key} > div {{
+        display: flex;
+        justify-content: flex-end;
+    }}
+    </style>
+    <div class="vm-ghost-{field_key}" id="vm-ghost-{field_key}"></div>
+    """, unsafe_allow_html=True)
+
+    # Use JS to move the next sibling button into the ghost div
+    _, btn_col = st.columns([10, 1])
     with btn_col:
-        st.markdown(
-            f"""
-            <style>
-            div[data-testid="column"]:last-child .stButton > button {{
-                background: none !important;
-                border: none !important;
-                box-shadow: none !important;
-                color: #9a9892 !important;
-                font-size: 0.72rem !important;
-                font-weight: 500 !important;
-                padding: 0 2px !important;
-                min-height: unset !important;
-                width: auto !important;
-                line-height: 1.4 !important;
-                letter-spacing: 0.01em;
-            }}
-            div[data-testid="column"]:last-child .stButton > button:hover {{
-                color: #01696f !important;
-                background: none !important;
-            }}
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
-        if st.button(f"view/modify {chevron}", key=f"btn_{field_key}"):
+        clicked = st.button(f"view/modify {chevron}", key=f"btn_{field_key}")
+        if clicked:
             st.session_state[show_key] = not is_open
             st.rerun()
 
     if st.session_state.get(show_key, False):
-        pills_html = "&emsp;&nbsp;".join(
-            f"<span style='color:#7a7974;font-size:0.8rem'>{label}:</span>&nbsp;"
+        pills_html = "&emsp;".join(
+            f"<span style='color:#7a7974;font-size:0.8rem'>{label}:</span> "
             f"<b style='color:#01696f;font-size:0.8rem'>{val:.2f}</b>"
             for label, val in score_rows
         )
 
-        st.markdown(
-            f"""
+        # Single unified container with everything inside
+        with st.container():
+            st.markdown(f"""
             <div style='
                 background:#f9f8f5;
-                border:1px solid #e8e5e0;
+                border:1px solid #e0ddd8;
                 border-radius:8px;
-                padding:12px 16px 4px 16px;
-                margin-bottom:4px;
+                padding:10px 14px 6px 14px;
+                margin:2px 0 6px 0;
             '>
-                <div style='margin-bottom:10px'>{pills_html}</div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        with st.container():
-            use_override = st.toggle("Override score", key=use_key)
+                <div style='margin-bottom:8px;line-height:1.8'>{pills_html}</div>
+            </div>""", unsafe_allow_html=True)
+            
+            col_toggle, _ = st.columns([3, 7])
+            with col_toggle:
+                use_override = st.toggle("Override score", key=use_key)
+            
             if use_override:
                 st.number_input(
-                    "Override value (0.0–1.0)", min_value=0.0, max_value=1.0,
+                    "Override (0.0–1.0)", min_value=0.0, max_value=1.0,
                     step=0.05, value=float(auto_score), key=ov_key,
-                    label_visibility="collapsed"
+                    label_visibility="visible"
                 )
             st.text_area(
                 "Comment", key=cmt_key, height=60,
@@ -212,7 +220,6 @@ def score_modifier(field_key, auto_score, category, score_table=None,
     if st.session_state.get(use_key, False):
         return float(st.session_state.get(ov_key, auto_score))
     return float(auto_score)
-
 
 RATING_DESC = {
     "A": ("Very Strong Fit",  "Excellent candidate. High priority for engagement."),
