@@ -120,7 +120,7 @@ def score_modifier(field_key, auto_score, category, score_table=None):
     with col_btn:
         if st.button("view/modify", key=f"btn_{field_key}", 
                      help="View scores or override",
-                     use_container_width=True):
+                     use_container_width=False):
             st.session_state[show_key] = not st.session_state.get(show_key, False)
 
     if st.session_state.get(show_key, False):
