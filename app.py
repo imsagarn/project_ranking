@@ -277,7 +277,7 @@ def q_expander(q_key, label, auto_score, max_score=1, category=""):
     col_l, col_r = st.columns([5, 1])
 
     with col_r:
-        with st.expander("view/modify ▾", expanded=False):
+        with st.expander("⚙️", expanded=False):
 
             col_a, col_b = st.columns([2, 3])
 
@@ -319,7 +319,7 @@ def q_expander(q_key, label, auto_score, max_score=1, category=""):
     effective = st.session_state[score_key] if st.session_state[override_key] else float(auto_score)
     return effective, st.session_state[comment_key]
 
-with st.expander("⚙️", expanded=False):
+
 # ── UI ────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <div class="main-header">
