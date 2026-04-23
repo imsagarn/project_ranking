@@ -167,7 +167,7 @@ CATEGORY_LABELS = {
 }
 
 QUESTION_COMPONENTS = {
-    "q1":  ["application_storage", "application_viability"],
+    "q1":  ["Storage Required", "Application Viability"], #check with project status
     "q2":  ["country_fit"],
     "q3":  ["national_priority"],
     "q4":  [],
