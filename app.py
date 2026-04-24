@@ -1,7 +1,13 @@
 import streamlit as st
 from datetime import date
 
-st.set_page_config(page_title="H2 Project Ranking Engine",page_icon layout="wide")# ─────────────────────────────────────────────────────────────
+
+st.set_page_config(
+    page_title="H2 Project Ranking Engine",
+    page_icon="🏗️",
+    layout="wide"
+)
+ ─────────────────────────────────────────────────────────────
 # Custom Styles
 # ─────────────────────────────────────────────────────────────
 st.markdown("""
