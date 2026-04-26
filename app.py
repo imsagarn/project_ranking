@@ -1,7 +1,7 @@
 # ⚡ H2 Project Ranking Engine
 # Evaluate, save, compare, and rank hydrogen projects
 # based on project viability and Delphy chance to win.
-
+pip install plotly
 import streamlit as st
 import pandas as pd
 import json
