@@ -429,7 +429,7 @@ def quantity_score(qty):
         return 1
     if qty < 100:
         return 0.5
-    if qty <500
+    if qty <500:
         return 0.25
     return 0.5
 
