@@ -424,9 +424,13 @@ def quantity_score(qty):
     if qty < 1:
         return 0
     if qty < 5:
-        return 0.5
-    if qty < 15:
+        return 0.25
+    if qty < 50:
         return 1
+    if qty < 100:
+        return 0.5
+    if qty <500
+        return 0.25
     return 0.5
 
 def h2_source_val():
@@ -911,8 +915,9 @@ with col_form:
     with c2:
         st.text_input("Evaluated by", placeholder="Your name", key="evaluated_by")
     c3, c4 = st.columns(2)
-    with c3:
-        optional_select("Project Region", REGIONS, key="region")
+    with c3:    
+        st.markdown("Project Region")
+        optional_select("", REGIONS, key="region")
     with c4:
         st.date_input("Date", key="eval_date", value=st.session_state.get("eval_date"))
     st.markdown('</div>', unsafe_allow_html=True)
