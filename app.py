@@ -228,12 +228,12 @@ def get_saved_projects_df():
 
 
 def distinct_entry_colors(n):
-    new entries get clearly different colors.    """
+    """
+    Generate visually distinct colors for each saved entry.
     """
     if n <= 0:
         return []
     return [f"hsl({(i * 137.508) % 360:.1f}, 70%, 48%)" for i in range(n)]
-    Generate visually distinct colors for each saved entry.
 
 
 def parse_float(value):
