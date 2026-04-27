@@ -81,8 +81,13 @@ CONTRACT_SIGNED    = {"Yes": 1, "A Few": 0.5, "Not Any": 0}
 OFFTAKER           = {"Yes, Binding": 1, "Yes, Self Consumption": 1, "Yes, MoU": 0.5, "No": 0}
 LAND_AREA          = {"Yes": 1, "No": 0, "In Process": 0.5}
 PERMITS            = {"Permitted": 1, "Applied": 0.5, "No Update": 0}
-ENG_MATURITY       = {"Conceptual": 0.25, "Feed": 0.75, "Waiting FID less than 2 years": 0.5,
-                      "Waiting more than 2 years": 1, "Under Construction": 0.5}
+ENG_MATURITY       = {
+    "Conceptual": 0.25,
+    "Feed": 0.75,
+    "Waiting FID less than 2 years": 0.5,
+    "Waiting more than 2 years": 1,
+    "Under Construction": 0.5
+}
 H2_DNA             = {"Yes": 1, "50-50": 0.5, "No": 0}
 TRACK_RECORD       = {"Startup": 0, "Multiple H2 projects": 0.5, "Industrial giants": 1}
 INNOVATION         = {"Yes": 1, "Prefer not to": 0, "May be": 0.5}
@@ -162,6 +167,11 @@ for k, v in DEFAULTS.items():
 for qid in ALL_QIDS:
     st.session_state.setdefault(f"override_{qid}", False)
     st.session_state.setdefault(f"comment_{qid}", "")
+
+# FIX: pending actions so widget-bound state is only modified
+# BEFORE widgets are rendered on the next rerun.
+st.session_state.setdefault("pending_load_record", None)
+st.session_state.setdefault("pending_reset_form", None)
 
 # ── Persistence helpers ────────────────────────────────────────────────────────
 
@@ -358,6 +368,7 @@ def load_project_into_form(record):
 
         st.session_state["total_cost"] = "" if answers.get("total_cost") in [None, "None", ""] else str(answers.get("total_cost"))
         st.session_state["funding_secured"] = "" if answers.get("funding_secured") in [None, "None", ""] else str(answers.get("funding_secured"))
+
         qty = answers.get("h2_quantity")
         if qty not in [None, "None", ""]:
             if st.session_state.get("h2_source") == "Produced on site":
@@ -847,6 +858,21 @@ def render_portfolio_chart():
     ]
     st.dataframe(table_df, use_container_width=True, hide_index=True)
 
+# ── FIX: process pending actions BEFORE any widgets are rendered ──────────────
+
+def process_pending_actions():
+    if st.session_state.get("pending_reset_form") is not None:
+        clear_editing = st.session_state["pending_reset_form"]
+        st.session_state["pending_reset_form"] = None
+        reset_form(clear_editing=clear_editing)
+
+    record = st.session_state.get("pending_load_record")
+    if record is not None:
+        st.session_state["pending_load_record"] = None
+        load_project_into_form(record)
+
+process_pending_actions()
+
 # ── Header ─────────────────────────────────────────────────────────────────────
 
 st.markdown("""
@@ -892,7 +918,7 @@ with col_form:
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">🏭 Application & Market</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">🏭 Application &amp; Market</div>', unsafe_allow_html=True)
 
     st.markdown(f'**1. Application area?** {vtag()} {dtag()}', unsafe_allow_html=True)
     optional_select("Application area", APPLICATIONS.keys(), key="application")
@@ -915,7 +941,7 @@ with col_form:
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">💰 Funding & Finance</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">💰 Funding &amp; Finance</div>', unsafe_allow_html=True)
 
     st.markdown(f'**4. What is the current funding status?** {vtag()}', unsafe_allow_html=True)
     cq4a, cq4b = st.columns(2)
@@ -1094,7 +1120,7 @@ with col_form:
     with b2:
         clear_clicked = st.button("🧹 Clear Form", use_container_width=True)
         if clear_clicked:
-            reset_form()
+            st.session_state["pending_reset_form"] = True
             st.session_state["flash_message"] = "Form cleared."
             st.session_state["flash_type"] = "info"
             st.rerun()
@@ -1125,7 +1151,8 @@ with col_result:
             st.session_state["flash_message"] = f"✅ Evaluation {action} for **{project_name}**."
             st.session_state["flash_type"] = "success"
 
-            reset_form()
+            # FIX: defer reset to next rerun before widgets are built
+            st.session_state["pending_reset_form"] = True
             st.rerun()
 
     rating = scores["rating"]
@@ -1266,7 +1293,8 @@ with col_result:
                 if selected_option != "-- Select project --":
                     record = find_record_by_option(selected_option, saved_records)
                     if record:
-                        load_project_into_form(record)
+                        # FIX: defer loading until next rerun
+                        st.session_state["pending_load_record"] = record
                         st.session_state["flash_message"] = f"Loaded saved project for editing: **{record.get('project_name', '')}**."
                         st.session_state["flash_type"] = "info"
                         st.rerun()
@@ -1278,7 +1306,8 @@ with col_result:
                     if record:
                         delete_saved_project(record.get("project_name", ""), record.get("region", ""))
                         if st.session_state.get("editing_original_key") == project_key(record.get("project_name", ""), record.get("region", "")):
-                            reset_form()
+                            # FIX: defer reset until next rerun
+                            st.session_state["pending_reset_form"] = True
                         st.session_state["flash_message"] = f"Deleted saved project: **{record.get('project_name', '')}**."
                         st.session_state["flash_type"] = "success"
                         st.rerun()
