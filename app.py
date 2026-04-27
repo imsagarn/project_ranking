@@ -226,6 +226,16 @@ def get_saved_projects_df():
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+
+def distinct_entry_colors(n):
+    new entries get clearly different colors.    """
+    """
+    if n <= 0:
+        return []
+    return [f"hsl({(i * 137.508) % 360:.1f}, 70%, 48%)" for i in range(n)]
+    Generate visually distinct colors for each saved entry.
+
+
 def parse_float(value):
     if value is None:
         return None
@@ -785,8 +795,7 @@ def render_portfolio_chart():
     df = get_saved_projects_df()
 
     st.markdown("#### 🫧 Saved Project Portfolio")
-    st.markdown(
-        '<div class="small-note">X-axis = Project Viability (%), Y-axis = Delphy Chance to Win (%), bubble size = H₂ quantity to store (tonnes), legend = project name.</div>',
+    st.</div>',    st.markdown(
         unsafe_allow_html=True
     )
 
@@ -807,6 +816,10 @@ def render_portfolio_chart():
     chart_df["size_px"] = bubble_pixel_sizes(chart_df["size_value"].tolist())
     chart_df["size_text"] = chart_df["size_value"].apply(format_tonnes_label)
 
+    # NEW: assign a unique color to every saved entry
+    chart_df = chart_df.reset_index(drop=True)
+    chart_df["point_color"] = distinct_entry_colors(len(chart_df))
+
     fig = go.Figure()
 
     for _, row in chart_df.iterrows():
@@ -820,9 +833,10 @@ def render_portfolio_chart():
             textfont=dict(color="white", size=12, family="Inter, sans-serif"),
             marker=dict(
                 size=row["size_px"],
-                color=RATING_DOT.get(row["rating"], "#5a5a7a"),
+                color=row["point_color"],  # UNIQUE COLOR PER ENTRY
                 opacity=0.85,
-                line=dict(width=1.2, color="white")
+                # Keep rating meaning as outline color
+                line=dict(width=2, color=RATING_DOT.get(row["rating"], "#FFFFFF"))
             ),
             hovertemplate=(
                 f"<b>{row['project_name']}</b><br>"
@@ -861,6 +875,8 @@ def render_portfolio_chart():
         "Viability %", "Delphy %", "H2 Qty (t)", "Total %"
     ]
     st.dataframe(table_df, use_container_width=True, hide_index=True)
+        '<div class="small-note">X-axis = Project Viability (%), Y-axis = Delphy Chance to Win (%), '
+
 
 # ── FIX: process pending actions BEFORE any widgets are rendered ──────────────
 
