@@ -90,7 +90,7 @@ ENG_MATURITY       = {
 }
 H2_DNA             = {"Yes": 1, "50-50": 0.5, "No": 0}
 TRACK_RECORD       = {"Startup": 0, "Multiple H2 projects": 0.5, "Industrial giants": 1}
-INNOVATION         = {"Yes": 1, "Prefer not to": 0, "May be": 0.5}
+INNOVATION         = {"Initial Queries": 0.25, "Highly Interested": 1, "No Contact Yet": 0.0, "Not Interested": 0.0}
 FOOTPRINT          = {"Yes": 1, "Not so much": 0.5, "Not at all": 0}
 SAFETY             = {"Yes, absolutely": 1, "Preferred": 0.5, "Minimum": 0}
 GEO_CONSTRAINT     = {"No constraints": 1, "Difficult": 0, "Not sure": 0.5}
@@ -611,7 +611,7 @@ def build_components(answers):
     }
     components["innovation"] = {
         "id": "innovation", "question": "q18",
-        "label": "Open to innovative solutions",
+        "label": "Interest in Delphy",
         "category": "delphy", "score": INNOVATION.get(answers.get("innovation"), 0), "max": 1.0,
     }
     components["footprint"] = {
@@ -1120,8 +1120,8 @@ with col_form:
     optional_select("Developer track record", TRACK_RECORD.keys(), key="track_record")
     render_view_modify("q17")
 
-    st.markdown(f'**18. Are the developer and stakeholders open to innovative solutions?** {dtag()}', unsafe_allow_html=True)
-    optional_select("Open to innovative solutions", INNOVATION.keys(), key="innovation")
+    st.markdown(f'**18. Are the developer interested in Delphy?** {dtag()}', unsafe_allow_html=True)
+    optional_select("Interest in Delphy", INNOVATION.keys(), key="innovation")
     render_view_modify("q18")
 
     st.markdown(f'**19. Is there a footprint constraint in the area?** {dtag()}', unsafe_allow_html=True)
